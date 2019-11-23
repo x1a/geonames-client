@@ -120,46 +120,48 @@ class Client
      * @var array $endpoints
      */
     protected $endpoints = [
-        'astergdem'                  => false,
-        'children'                   => 'geonames',
-        'cities'                     => 'geonames',
-        'contains'                   => 'geonames',
-        'countryCode'                => false,
-        'countryInfo'                => 'geonames',
-        'countrySubdivision'         => false,
-        'earthquakes'                => 'earthquakes',
-        'findNearby'                 => 'geonames',
-        'findNearbyPlaceName'        => 'geonames',
-        'findNearbyPostalCodes'      => 'postalCodes',
-        'findNearbyStreets'          => 'streetSegment', // US only
-        'findNearbyStreetsOSM'       => 'streetSegment',
-        'findNearByWeather'          => 'weatherObservation',
-        'findNearbyWikipedia'        => 'geonames',
-        'findNearestAddress'         => 'address', // US only
-        'findNearestIntersection'    => 'intersection', // US only
+        'astergdem' => false,
+        'children' => 'geonames',
+        'cities' => 'geonames',
+        'contains' => 'geonames',
+        'countryCode' => false,
+        'countryInfo' => 'geonames',
+        'countrySubdivision' => false,
+        'earthquakes' => 'earthquakes',
+        'findNearby' => 'geonames',
+        'findNearbyPlaceName' => 'geonames',
+        'findNearbyPostalCodes' => 'postalCodes',
+        'findNearbyStreets' => 'streetSegment', // US only
+        'findNearbyStreetsOSM' => 'streetSegment',
+        'findNearByWeather' => 'weatherObservation',
+        'findNearbyWikipedia' => 'geonames',
+        'findNearestAddress' => 'address', // US only
+        'findNearestIntersection' => 'intersection', // US only
         'findNearestIntersectionOSM' => 'intersection',
-        'findNearbyPOIsOSM'          => 'poi',
-        'address'                    => 'address',
-        'geoCodeAddress'             => 'address',
-        'get'                        => false,
-        'gtopo30'                    => false,
-        'hierarchy'                  => 'geonames',
-        'neighbourhood'              => 'neighbourhood', // US only
-        'neighbours'                 => 'geonames',
-        'ocean'                      => 'ocean',
-        'postalCodeCountryInfo'      => 'geonames',
-        'postalCodeLookup'           => 'postalcodes',
-        'postalCodeSearch'           => 'postalCodes', // not a typo
-        'search'                     => 'geonames',
-        'siblings'                   => 'geonames',
-        'srtm1'                      => false,
-        'srtm3'                      => false,
-        'timezone'                   => false,
-        'weather'                    => 'weatherObservations',
-        'weatherIcao'                => 'weatherObservation',
-        'wikipediaBoundingBox'       => 'geonames',
-        'wikipediaSearch'            => 'geonames',
+        'findNearbyPOIsOSM' => 'poi',
+        'address' => 'address',
+        'geoCodeAddress' => 'address',
+        'get' => false,
+        'gtopo30' => false,
+        'hierarchy' => 'geonames',
+        'neighbourhood' => 'neighbourhood', // US only
+        'neighbours' => 'geonames',
+        'ocean' => 'ocean',
+        'postalCodeCountryInfo' => 'geonames',
+        'postalCodeLookup' => 'postalcodes',
+        'postalCodeSearch' => 'postalCodes', // not a typo
+        'search' => 'geonames',
+        'siblings' => 'geonames',
+        'srtm1' => false,
+        'srtm3' => false,
+        'timezone' => false,
+        'weather' => 'weatherObservations',
+        'weatherIcao' => 'weatherObservation',
+        'wikipediaBoundingBox' => 'geonames',
+        'wikipediaSearch' => 'geonames',
     ];
+
+    protected $backupRootProperty = [];
 
     /**
      * Constructor.
@@ -169,7 +171,7 @@ class Client
      * @link http://www.geonames.org/
      *
      * @param string $username Required for both Free and Commercial users.
-     * @param string $token    Optional. Commercial users only.
+     * @param string $token Optional. Commercial users only.
      *
      * @return void
      */
@@ -185,11 +187,11 @@ class Client
      * Queries the endpoint using the parameters.
      *
      * @param string $endpoint The endpoint to call.
-     * @param array  $params   Optional. Parameters to pass to the endpoint.
-     *
-     * @throws Exception When an invalid method is called or when the web service returns an error.
+     * @param array $params Optional. Parameters to pass to the endpoint.
      *
      * @return object \stdClass The response object.
+     * @throws Exception When an invalid method is called or when the web service returns an error.
+     *
      */
     public function __call(string $endpoint, array $params = [])
     {
@@ -224,7 +226,7 @@ class Client
         $HttpClient_args = [
             'base_uri' => $this->url,
             // @see https://curl.haxx.se/docs/caextract.html
-            'verify'   => __DIR__ . DIRECTORY_SEPARATOR . 'cacert.pem',
+            'verify' => __DIR__ . DIRECTORY_SEPARATOR . 'cacert.pem',
         ];
 
         // handle proxy
@@ -315,12 +317,66 @@ class Client
     /**
      * Returns an array of supported endpoints.
      *
+     * @return array An array of endpoints supported.
      * @see $endpoints
      *
-     * @return array An array of endpoints supported.
      */
     public function getSupportedEndpoints()
     {
         return array_keys($this->endpoints);
+    }
+
+    /**
+     * Resets endpoint root property to access totalResultsCount
+     *
+     * @param string $endpoint
+     * @return $this
+     * @throws Exception
+     */
+    public function resetRootProperty(string $endpoint)
+    {
+        // check that the endpoint is supported
+        if (!in_array($endpoint, $this->getSupportedEndpoints())) {
+            throw new \Exception(
+                "Unsupported endpoint: {$endpoint}",
+                self::UNSUPPORTED_ENDPOINT
+            );
+        }
+
+        $this->backupRootProperty[$endpoint] = $this->endpoints[$endpoint];
+        $this->endpoints[$endpoint] = false;
+        return $this;
+    }
+
+    /**
+     * @param string $endpoint
+     * @return $this
+     */
+    public function restoreRootProperty(string $endpoint)
+    {
+        if (array_key_exists($endpoint, $this->backupRootProperty)) {
+            $this->endpoints[$endpoint] = $this->backupRootProperty[$endpoint];
+            unset($this->backupRootProperty[$endpoint]);
+        }
+        return $this;
+    }
+
+    /**
+     * @param string $endpoint
+     * @return mixed
+     * @throws Exception
+     */
+    public function getRootProperty(string $endpoint)
+    {
+        // check that the endpoint is supported
+        if (!in_array($endpoint, $this->getSupportedEndpoints())) {
+            throw new \Exception(
+                "Unsupported endpoint: {$endpoint}",
+                self::UNSUPPORTED_ENDPOINT
+            );
+        }
+
+        return array_key_exists($endpoint, $this->backupRootProperty) ?
+            $this->backupRootProperty[$endpoint] : $this->endpoints[$endpoint];
     }
 }
